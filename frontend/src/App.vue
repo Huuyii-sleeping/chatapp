@@ -1,20 +1,36 @@
+<!-- src/components/ChatRoom.vue -->
 <template>
   <div class="chat-container">
-    <h2>Socket.IO 聊天室 (Vue + NestJS)</h2>
+    <h2>多房间聊天室 (Vue + NestJS)</h2>
 
-    <div class="input-section">
+    <!-- 加入房间表单 -->
+    <div v-if="!joined" class="join-form">
+      <input v-model="username" placeholder="昵称" @keyup.enter="joinRoom" />
       <input
-        v-model="username"
-        placeholder="请输入昵称"
-        @keyup.enter="joinChat"
-        :disabled="joined"
+        v-model="room"
+        placeholder="房间名（如：room1）"
+        @keyup.enter="joinRoom"
       />
-      <button @click="joinChat" :disabled="joined || !username.trim()">
-        {{ joined ? "已加入" : "加入聊天" }}
-      </button>
+      <button @click="joinRoom" :disabled="!canJoin">加入房间</button>
     </div>
 
-    <div v-if="joined" class="chat-section">
+    <!-- 聊天界面 -->
+    <div v-else class="chat-section">
+      <div class="counter-section">
+        <h3>实时计数器(全局)</h3>
+        <div class="counter-display">
+          <span>当前计数：{{ count }}</span>
+          <button @click="increment" :disabled="!socket"></button>
+        </div>
+      </div>
+
+      <div class="room-info">
+        <span
+          >当前房间: <strong>{{ currentRoom }}</strong></span
+        >
+        <button @click="leaveRoom" style="margin-left: 10px">退出房间</button>
+      </div>
+
       <div class="messages" ref="messagesContainer">
         <div v-for="(msg, index) in messages" :key="index" class="message">
           <strong>[{{ msg.time }}] {{ msg.user }}:</strong> {{ msg.msg }}
@@ -36,52 +52,90 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
+import { ref, onMounted, onUnmounted, nextTick, computed } from "vue";
 import { io } from "socket.io-client";
-import { nextTick, onUnmounted, ref } from "vue";
 
 const username = ref("");
+const room = ref("general"); // 默认房间
 const newMessage = ref("");
-const messages = ref([]) as any;
+const messages = ref([]);
 const joined = ref(false);
-const socket = ref(null) as any;
-const messagesContainer = ref(null) as any;
-const joinChat = () => {
-  if (!username.value.trim()) {
-    return;
+const currentRoom = ref("");
+const socket = ref(null);
+const messagesContainer = ref(null);
+const count = ref(0);
+
+const canJoin = computed(() => {
+  return username.value.trim() && room.value.trim();
+});
+
+const joinRoom = () => {
+  if (!canJoin.value) return;
+
+  // 如果已连接，先断开（或复用连接）
+  if (socket.value) {
+    socket.value.disconnect();
   }
+
   socket.value = io("http://localhost:3000");
 
   socket.value.on("connect", () => {
-    console.log("websocket连接成功");
+    console.log("连接成功，加入房间...");
+    socket.value.emit("joinRoom", {
+      username: username.value.trim(),
+      room: room.value.trim(),
+    });
+  });
+
+  socket.value.on("joinedRoom", (data) => {
     joined.value = true;
+    currentRoom.value = data.room;
+    messages.value = []; // 清空历史（或可保留）
     messages.value.push({
       user: "系统",
-      msg: "你已经加入聊天室",
+      msg: `你已加入房间 "${data.room}"`,
       time: new Date().toLocaleTimeString(),
     });
   });
 
-  socket.value.on("message", (data: any) => {
+  socket.value.on("countUpdate", (newCount) => {
+    console.log('----newCount:', newCount)
+    count.value = newCount;
+  });
+
+  socket.value.on("message", (data) => {
     messages.value.push(data);
     nextTick(() => {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
     });
   });
 
-  socket.value.on("disconnect", () => {
-    console.log("websocket 断开连接");
+  socket.value.on("error", (err) => {
+    alert("错误: " + err.msg);
   });
 };
 
 const sendMessage = () => {
   if (!newMessage.value.trim() || !socket.value) return;
-  socket.value.emit("sendMessage", {
-    user: username.value,
-    msg: newMessage.value,
-  });
+  socket.value.emit("sendMessage", { msg: newMessage.value });
   newMessage.value = "";
 };
+
+const leaveRoom = () => {
+  if (socket.value) {
+    socket.value.disconnect();
+  }
+  joined.value = false;
+  messages.value = [];
+  currentRoom.value = "";
+};
+
+const increment = () => {
+  console.log(socket.value);
+  if (socket.value) socket.value.emit("increment");
+};
+
 onUnmounted(() => {
   if (socket.value) {
     socket.value.disconnect();
@@ -90,13 +144,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 保留之前的样式，略作调整 */
 .chat-container {
   max-width: 800px;
   margin: 20px auto;
   padding: 20px;
   font-family: Arial, sans-serif;
 }
-.input-section,
+.counter-section {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #007bff;
+  border-radius: 8px;
+  background: #f0f8ff;
+}
+.counter-display {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+.counter-display button {
+  background: #28a745;
+}
+.join-form,
 .send-section {
   display: flex;
   gap: 10px;
@@ -130,5 +201,9 @@ button:disabled {
 .message {
   margin-bottom: 8px;
   word-wrap: break-word;
+}
+.room-info {
+  margin-bottom: 10px;
+  font-weight: bold;
 }
 </style>
