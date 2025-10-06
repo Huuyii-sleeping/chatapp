@@ -78,7 +78,7 @@ export class ChatGateway
       time: new Date().toLocaleTimeString(),
     };
     this.server.to(user!.room).emit('message', message);
-  }
+  } 
 
   @SubscribeMessage('increment')
   handleIncrement(client: Socket) {

@@ -102,7 +102,7 @@ const joinRoom = () => {
   socket.value.on("countUpdate", (newCount) => {
     console.log('----newCount:', newCount)
     count.value = newCount;
-  });
+  }); 
 
   socket.value.on("message", (data) => {
     messages.value.push(data);
