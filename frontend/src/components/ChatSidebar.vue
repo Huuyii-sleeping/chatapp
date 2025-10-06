@@ -28,21 +28,35 @@
         </li>
       </ul>
     </div>
+
+    <PollPanel
+      :socket="socket"
+      :current-room="currentRoom"
+      :username="username"
+      ref="pollPanel"
+    />
   </div>
 </template>
 
 <script setup>
+import PollPanel from './VotePanel.vue'
+import { ref } from 'vue';
 defineProps({
   count: Number,
   onlineUsers: Array,
   privateChatTarget: Object,
-  socket: Object
+  socket: Object,
+  currentRoom: String,
+  username: String,
+});
+
+const emit = defineEmits(["increment", "startPrivateChat"]);
+const pollPanel = ref(null)
+const onIncrement = () => emit("increment");
+const onUserClick = (user) => emit("startPrivateChat", user);
+defineExpose({
+  getPollPanel: () => pollPanel.value
 })
-
-const emit = defineEmits(['increment', 'startPrivateChat'])
-
-const onIncrement = () => emit('increment')
-const onUserClick = (user) => emit('startPrivateChat', user)
 </script>
 
 <style scoped>

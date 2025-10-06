@@ -12,6 +12,9 @@
 
     <div v-else class="chat-main">
       <ChatSidebar
+        ref="sidebarComponent"
+        :username="username"
+        :currentRoom="currentRoom"
         :count="count"
         :online-users="onlineUsers"
         :private-chat-target="privateChatTarget"
@@ -69,6 +72,7 @@ const onlineUsers = ref([]);
 const privateChatTarget = ref(null);
 const messagesComponent = ref(null);
 const isWriting = ref("");
+const sidebarComponent = ref(null);
 
 const joinRoom = ({ username: uname, room: rname }) => {
   if (socket.value) socket.value.disconnect();
@@ -93,6 +97,18 @@ const joinRoom = ({ username: uname, room: rname }) => {
     });
     // 请求历史消息（需后端实现）
     socket.value.emit("requestMessageHistory", data.room);
+  });
+
+  socket.value.on("newPoll", (pollData) => {
+    sidebarComponent.value.getPollPanel().startPoll(pollData);
+  });
+
+  socket.value.on("voteUpdate", (votes) => {
+    sidebarComponent.value.getPollPanel().updatePoll(votes);
+  });
+
+  socket.value.on("pollEnd", () => {
+    sidebarComponent.value.getPollPanel().resetPoll();
   });
 
   socket.value.on("userListUpdate", (users) => {

@@ -28,12 +28,20 @@ export class ChatGateway
   private users: Map<String, User> = new Map();
   private count: number = 0;
   private messageHistory: any[] = [];
+  private polls: Map<
+    string,
+    {
+      question: string;
+      options: string[];
+      votes: number[];
+      creator: string;
+    }
+  > = new Map();
   private getOnlineList() {
     const arr = Array.from(this.users.values()).map((u) => ({
       socketId: u.socketId,
       username: u.username,
     }));
-    console.log(arr);
     return arr;
   }
 
@@ -74,7 +82,7 @@ export class ChatGateway
       msg: `${username} 加入了房间`,
       time: new Date().toLocaleTimeString(),
     });
-    this.server.emit('messageHistory', this.messageHistory)
+    this.server.emit('messageHistory', this.messageHistory);
     this.server.emit('userListUpdate', this.getOnlineList());
     client.emit('joinedRoom', { room, username });
   }
@@ -125,16 +133,81 @@ export class ChatGateway
   }
 
   @SubscribeMessage('isWritePublic')
-  handleIsWritePublic(client: Socket){
-    const user = this.users.get(client.id)
-    this.server.to(user!.room).emit('whoIsWrite', user?.username)
+  handleIsWritePublic(client: Socket) {
+    const user = this.users.get(client.id);
+    this.server.to(user!.room).emit('whoIsWrite', user?.username);
   }
 
   @SubscribeMessage('increment')
   handleIncrement(client: Socket) {
-    console.log('increment');
     this.count++;
-    console.log(this.count);
     this.server.emit('countUpdate', this.count);
+  }
+
+  @SubscribeMessage('createPoll')
+  handleCreatePoll(
+    client: Socket,
+    payload: { room: string; question: string; options: string[] },
+  ) {
+    const user = this.users.get(client.id);
+    console.log(user)
+    if (!user || user.room !== payload.room) {
+      client.emit('error', { msg: '无法在当前房间创建投票' });
+      return;
+    }
+
+    const poll = {
+      question: payload.question,
+      options: payload.options,
+      votes: new Array(payload.options.length).fill(0),
+      creator: user.username,
+    };
+    this.polls.set(payload.room, poll)
+    this.server.to(payload.room).emit('newPoll', {
+      ...poll,
+      creator: user.username,
+    });
+  }
+
+  @SubscribeMessage('submitVote')
+  handleSubmitVote(
+    client: Socket,
+    payload: { room: string; optionIndex: number },
+  ) {
+    const user = this.users.get(client.id);
+    const poll = this.polls.get(payload.room);
+    console.log(user, poll)
+
+    if (
+      !user ||
+      !poll ||
+      payload.optionIndex < 0 ||
+      payload.optionIndex >= poll.votes.length
+    ) {
+      client.emit('error', { msg: '无效的投票' });
+      return;
+    }
+
+    // 记录投票（简单实现：允许多次投票，实际项目应记录已投票用户）
+    poll.votes[payload.optionIndex]++;
+    this.polls.set(payload.room, poll);
+
+    // 广播更新后的投票结果
+    this.server.to(payload.room).emit('voteUpdate', poll.votes);
+  }
+
+  @SubscribeMessage('endPoll')
+  handleEndPoll(client: Socket, payload: { room: string }) {
+    const user = this.users.get(client.id);
+    const poll = this.polls.get(payload.room);
+
+    if (!user || !poll || poll.creator !== user.username) {
+      client.emit('error', { msg: '只有创建者能结束投票' });
+      return;
+    }
+
+    // 删除投票并广播结束
+    this.polls.delete(payload.room);
+    this.server.to(payload.room).emit('pollEnded');
   }
 }
