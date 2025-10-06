@@ -29,10 +29,12 @@ export class ChatGateway
   private count: number = 0;
 
   private getOnlineList() {
-    return Array.from(this.users.values()).map((u) => ({
+    const arr = Array.from(this.users.values()).map((u) => ({
       socketId: u.socketId,
-      useranme: u.username,
+      username: u.username,
     }));
+    console.log(arr)
+    return arr;
   }
 
   afterInit(server: Server) {
