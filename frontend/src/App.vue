@@ -22,9 +22,11 @@
 
       <div class="chat-area">
         <div class="room-header">
-          <span
-            >当前房间: <strong>{{ currentRoom }}</strong></span
-          >
+          <span>
+            当前房间:
+            <strong>{{ currentRoom }}</strong>
+          </span>
+          <span v-if="isWriting">{{ isWriting }}正在输入</span>
           <button @click="leaveRoom" class="leave-btn">退出房间</button>
         </div>
 
@@ -37,7 +39,11 @@
           @close-private-chat="() => (privateChatTarget = null)"
         />
 
-        <PublicChatInput :socket="socket" @send-message="sendMessage" />
+        <PublicChatInput
+          :socket="socket"
+          @send-message="sendMessage"
+          @publicMessage="isWritePublic"
+        />
       </div>
     </div>
   </div>
@@ -52,7 +58,6 @@ import ChatMessages from "./components/ChatMessages.vue";
 import PrivateChatPanel from "./components/PrivateChatPanel.vue";
 import PublicChatInput from "./components/PublicChatInput.vue";
 
-// ===== 状态定义 =====
 const username = ref("");
 const room = ref("general");
 const messages = ref([]);
@@ -63,8 +68,8 @@ const count = ref(0);
 const onlineUsers = ref([]);
 const privateChatTarget = ref(null);
 const messagesComponent = ref(null);
+const isWriting = ref("");
 
-// ===== 核心方法 =====
 const joinRoom = ({ username: uname, room: rname }) => {
   if (socket.value) socket.value.disconnect();
 
@@ -103,6 +108,12 @@ const joinRoom = ({ username: uname, room: rname }) => {
     count.value = newCount;
   });
 
+  socket.value.on("whoIsWrite", (username) => {
+    isWriting.value = username;
+    if (timer) stopTimer();
+    startTimer();
+  });
+
   socket.value.on("message", (data) => {
     messages.value.push({ ...data, type: "room" });
     nextTick(() => messagesComponent.value?.scrollToBottom());
@@ -122,6 +133,25 @@ const joinRoom = ({ username: uname, room: rname }) => {
   });
 };
 
+let timer;
+
+const startTimer = () => {
+  if (timer) stopTimer();
+  timer = setTimeout(() => {
+    isWriting.value = null;
+  }, 1000);
+};
+
+const stopTimer = () => {
+  if (!timer) return;
+  clearTimeout(timer);
+  timer = null;
+};
+
+const isWritePublic = (msg) => {
+  socket.value.emit("isWritePublic");
+};
+
 const startPrivateChat = (user) => {
   privateChatTarget.value = user;
 };
@@ -134,7 +164,6 @@ const sendPrivateMessage = (msg) => {
     msg: msg,
   });
 
-  // 本地回显
   messages.value.push({
     user: username.value,
     to: privateChatTarget.value.username,
@@ -163,7 +192,6 @@ const increment = () => {
   if (socket.value) socket.value.emit("increment");
 };
 
-// ===== 生命周期 =====
 onUnmounted(() => {
   if (socket.value) socket.value.disconnect();
 });

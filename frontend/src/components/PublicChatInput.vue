@@ -14,22 +14,25 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from "vue";
 
 const props = defineProps({
-  socket: Object
-})
+  socket: Object,
+});
 
-const emit = defineEmits(['sendMessage'])
+const emit = defineEmits(["sendMessage", "publicMessage"]);
 
-const message = ref('')
+const message = ref("");
 
 const handleSend = () => {
   if (message.value.trim() && props.socket) {
-    emit('sendMessage', message.value)
-    message.value = ''
+    emit("sendMessage", message.value);
+    message.value = "";
   }
-}
+};
+watch(message, () => {
+  emit("publicMessage", message.value);
+});
 </script>
 
 <style scoped>

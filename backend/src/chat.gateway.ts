@@ -124,6 +124,12 @@ export class ChatGateway
     client.emit('privateMessage', { ...message, to: 'me' });
   }
 
+  @SubscribeMessage('isWritePublic')
+  handleIsWritePublic(client: Socket){
+    const user = this.users.get(client.id)
+    this.server.to(user!.room).emit('whoIsWrite', user?.username)
+  }
+
   @SubscribeMessage('increment')
   handleIncrement(client: Socket) {
     console.log('increment');
