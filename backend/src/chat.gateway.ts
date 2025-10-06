@@ -27,13 +27,13 @@ export class ChatGateway
 
   private users: Map<String, User> = new Map();
   private count: number = 0;
-
+  private messageHistory: any[] = [];
   private getOnlineList() {
     const arr = Array.from(this.users.values()).map((u) => ({
       socketId: u.socketId,
       username: u.username,
     }));
-    console.log(arr)
+    console.log(arr);
     return arr;
   }
 
@@ -74,6 +74,7 @@ export class ChatGateway
       msg: `${username} 加入了房间`,
       time: new Date().toLocaleTimeString(),
     });
+    this.server.emit('messageHistory', this.messageHistory)
     this.server.emit('userListUpdate', this.getOnlineList());
     client.emit('joinedRoom', { room, username });
   }
@@ -90,6 +91,8 @@ export class ChatGateway
       time: new Date().toLocaleTimeString(),
       type: 'room',
     };
+    this.messageHistory.push(message);
+    if (this.messageHistory.length > 50) this.messageHistory.shift();
     this.server.to(user!.room).emit('message', message);
   }
 
