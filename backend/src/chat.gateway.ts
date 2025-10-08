@@ -150,7 +150,7 @@ export class ChatGateway
     payload: { room: string; question: string; options: string[] },
   ) {
     const user = this.users.get(client.id);
-    console.log(user)
+    console.log(user);
     if (!user || user.room !== payload.room) {
       client.emit('error', { msg: '无法在当前房间创建投票' });
       return;
@@ -162,7 +162,7 @@ export class ChatGateway
       votes: new Array(payload.options.length).fill(0),
       creator: user.username,
     };
-    this.polls.set(payload.room, poll)
+    this.polls.set(payload.room, poll);
     this.server.to(payload.room).emit('newPoll', {
       ...poll,
       creator: user.username,
@@ -176,7 +176,7 @@ export class ChatGateway
   ) {
     const user = this.users.get(client.id);
     const poll = this.polls.get(payload.room);
-    console.log(user, poll)
+    console.log(user, poll);
 
     if (
       !user ||
@@ -188,11 +188,8 @@ export class ChatGateway
       return;
     }
 
-    // 记录投票（简单实现：允许多次投票，实际项目应记录已投票用户）
     poll.votes[payload.optionIndex]++;
     this.polls.set(payload.room, poll);
-
-    // 广播更新后的投票结果
     this.server.to(payload.room).emit('voteUpdate', poll.votes);
   }
 
@@ -200,14 +197,34 @@ export class ChatGateway
   handleEndPoll(client: Socket, payload: { room: string }) {
     const user = this.users.get(client.id);
     const poll = this.polls.get(payload.room);
-
     if (!user || !poll || poll.creator !== user.username) {
       client.emit('error', { msg: '只有创建者能结束投票' });
       return;
     }
 
-    // 删除投票并广播结束
     this.polls.delete(payload.room);
     this.server.to(payload.room).emit('pollEnded');
+  }
+
+  @SubscribeMessage('uploadImage')
+  handleUploadImage(
+    client: Socket,
+    payload: { room: string; base64: string; filename: string },
+  ) {
+    const user = this.users.get(client.id);
+    if (!user || user.room !== payload.room) {
+      client.emit('error', { msg: '不在当前的房间' });
+    }
+    if (payload.base64.length > 1e6) {
+      client.emit('error', { msg: '上传的文件太大' });
+    }
+
+    this.server.to(payload.room).emit('imageMessage', {
+      user: user?.username,
+      filename: payload.filename,
+      base64: payload.base64,
+      time: new Date().toLocaleTimeString(),
+      type: 'image',
+    });
   }
 }

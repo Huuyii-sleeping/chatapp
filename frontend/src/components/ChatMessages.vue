@@ -8,8 +8,22 @@
     >
       <template v-if="msg.type === 'private'">
         <strong class="private-label">[私聊]</strong>
-        <strong>[{{ msg.time }}] {{ msg.user }} → {{ msg.to === 'me' ? '你' : msg.to }}:</strong>
+        <strong>
+          [{{ msg.time }}] {{ msg.user }} →
+          {{ msg.to === "me" ? "你" : msg.to }}:
+        </strong>
         {{ msg.msg }}
+      </template>
+      <template v-if="msg.type === 'image'">
+        <strong>[{{ msg.time }}] {{ msg.user }}:</strong>
+        <div class="image-container">
+          <img
+            :src="msg.base64"
+            :alt="msg.filename"
+            @click="viewImage(msg.base64)"
+          />
+          <div class="image-filename">{{ msg.filename }}</div>
+        </div>
       </template>
       <template v-else>
         <strong>[{{ msg.time }}] {{ msg.user }}:</strong> {{ msg.msg }}
@@ -19,25 +33,64 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from "vue";
 
 defineProps({
-  messages: Array
-})
+  messages: Array,
+});
 
-const messagesContainer = ref(null)
+const messagesContainer = ref(null);
 
 // 暴露 scrollToBottom 方法给父组件
 const scrollToBottom = () => {
   if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
   }
-}
+};
 
-defineExpose({ scrollToBottom })
+const viewImage = (base64) => {
+  window.open(base64, "_blank");
+};
+
+defineExpose({ scrollToBottom });
 </script>
 
 <style scoped>
+.message {
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.image-msg {
+  background: #f8f9fa;
+  border-left: 3px solid #ff9800;
+  margin-left: 10px;
+}
+
+.image-container {
+  margin-top: 8px;
+  max-width: 300px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.image-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.image-filename {
+  padding: 5px;
+  font-size: 12px;
+  text-align: center;
+  background: #f8f9fa;
+  word-break: break-all;
+}
 .messages {
   flex: 1;
   padding: 15px;

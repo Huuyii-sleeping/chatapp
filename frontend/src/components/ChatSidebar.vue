@@ -28,6 +28,12 @@
         </li>
       </ul>
     </div>
+    <ImageUploader
+      :socket="socket"
+      :current-room="currentRoom"
+      :username="username"
+      @image-uploaded="onImageUploaded"
+    />
 
     <PollPanel
       :socket="socket"
@@ -39,8 +45,9 @@
 </template>
 
 <script setup>
-import PollPanel from './VotePanel.vue'
-import { ref } from 'vue';
+import PollPanel from "./VotePanel.vue";
+import ImageUploader from "./ImageUpload.vue";
+import { ref } from "vue";
 defineProps({
   count: Number,
   onlineUsers: Array,
@@ -51,12 +58,15 @@ defineProps({
 });
 
 const emit = defineEmits(["increment", "startPrivateChat"]);
-const pollPanel = ref(null)
+const pollPanel = ref(null);
 const onIncrement = () => emit("increment");
 const onUserClick = (user) => emit("startPrivateChat", user);
+const onImageUploaded = (imageData) => {
+  console.log("图片上传成功", imageData);
+};
 defineExpose({
-  getPollPanel: () => pollPanel.value
-})
+  getPollPanel: () => pollPanel.value,
+});
 </script>
 
 <style scoped>

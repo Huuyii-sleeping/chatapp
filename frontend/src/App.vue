@@ -99,6 +99,11 @@ const joinRoom = ({ username: uname, room: rname }) => {
     socket.value.emit("requestMessageHistory", data.room);
   });
 
+  socket.value.on("imageMessage", (data) => {
+    messages.value.push({ ...data, type: "image" });
+    nextTick(() => messagesComponent.value?.scrollToBottom());
+  });
+
   socket.value.on("newPoll", (pollData) => {
     sidebarComponent.value.getPollPanel().startPoll(pollData);
   });
