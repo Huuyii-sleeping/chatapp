@@ -96,7 +96,6 @@ const joinRoom = ({ username: uname, room: rname }) => {
   socket.value.on("joinedRoom", (data) => {
     joined.value = true;
     currentRoom.value = data.room;
-    messages.value = [];
     messages.value.push({
       user: "系统",
       msg: `你已加入房间 "${data.room}"`,
