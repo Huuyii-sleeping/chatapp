@@ -165,8 +165,8 @@ const viewImage = (img) => {
 .upload-btn input[type="file"] {
   position: absolute;
   opacity: 0;
-  width: 100%;
-  height: 100%;
+  width: 100px;
+  height: 30px;
   cursor: pointer;
   z-index: 10;
 }

@@ -1,4 +1,3 @@
-<!-- src/components/PublicChatInput.vue -->
 <template>
   <div class="send-section">
     <input
