@@ -227,4 +227,20 @@ export class ChatGateway
       type: 'image',
     });
   }
+
+  @SubscribeMessage('drawOp')
+  handleDrawop(client: Socket, payload: any) {
+    const user = this.users.get(client.id);
+    if (!user || user.room !== payload.room) {
+      client.emit('error', { msg: '不在当前的房间' });
+      return;
+    }
+
+    if (!['line', 'clear'].includes(payload.type)) {
+      client.emit('error', { msg: '无效的操作类型' });
+      return;
+    }
+
+    this.server.to(payload.room).emit('drawOp', payload);
+  }
 }

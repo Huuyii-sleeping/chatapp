@@ -41,12 +41,20 @@
       :username="username"
       ref="pollPanel"
     />
+
+    <Whiteboard
+      :socket="socket"
+      :current-room="currentRoom"
+      :username="username"
+      ref="whiteboard"
+    />
   </div>
 </template>
 
 <script setup>
 import PollPanel from "./VotePanel.vue";
 import ImageUploader from "./ImageUpload.vue";
+import Whiteboard from "./Whiteboard.vue";
 import { ref } from "vue";
 defineProps({
   count: Number,
