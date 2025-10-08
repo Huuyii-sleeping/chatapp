@@ -33,7 +33,12 @@
           <button @click="leaveRoom" class="leave-btn">退出房间</button>
         </div>
 
-        <ChatMessages ref="messagesComponent" :messages="messages" />
+        <ChatMessages
+          ref="messagesComponent"
+          :messages="messages"
+          :currentUser="username"
+          @message-read="handleMessageRead"
+        />
 
         <PrivateChatPanel
           :private-chat-target="privateChatTarget"
@@ -108,6 +113,18 @@ const joinRoom = ({ username: uname, room: rname }) => {
     sidebarComponent.value.getPollPanel().startPoll(pollData);
   });
 
+  socket.value.on("messageRead", (data) => {
+    const msgIndex = messages.value.findIndex((m) => m.msgId === data.msgId);
+    if (msgIndex >= 0) {
+      if (!messages.value[msgIndex].readBy) {
+        messages.value[msgIndex].readBy = [];
+      }
+      if (!messages.value[msgIndex].readBy.includes(data.reader)) {
+        messages.value[msgIndex].readBy.push(data.reader);
+      }
+    }
+  });
+
   socket.value.on("voteUpdate", (votes) => {
     sidebarComponent.value.getPollPanel().updatePoll(votes);
   });
@@ -136,7 +153,23 @@ const joinRoom = ({ username: uname, room: rname }) => {
   });
 
   socket.value.on("message", (data) => {
-    messages.value.push({ ...data, type: "room" });
+    const existingMsgIndex = messages.value.findIndex(
+      (m) => m.msgId === data.msgId
+    );
+
+    if (existingMsgIndex >= 0) {
+      messages.value[existingMsgIndex] = {
+        ...messages.value[existingMsgIndex],
+        ...data,
+      };
+    } else {
+      messages.value.push({
+        ...data,
+        readBy: [],
+        isReadByMe: false,
+      });
+    }
+
     nextTick(() => messagesComponent.value?.scrollToBottom());
   });
 
@@ -197,7 +230,21 @@ const sendPrivateMessage = (msg) => {
 
 const sendMessage = (msg) => {
   if (!socket.value) return;
-  socket.value.emit("sendMessage", { msg });
+  const msgId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+
+  socket.value.emit("sendMessage", {
+    msg: msg,
+    msgId,
+    room: currentRoom.value,
+  });
+};
+const handleMessageRead = (msgId) => {
+  if (socket.value && currentRoom.value) {
+    socket.value.emit("readReceipt", {
+      msgId: msgId,
+      room: currentRoom.value,
+    });
+  }
 };
 
 const leaveRoom = () => {

@@ -28,6 +28,15 @@ export class ChatGateway
   private users: Map<String, User> = new Map();
   private count: number = 0;
   private messageHistory: any[] = [];
+  // 存储消息的已读状态
+  private readStatus: Map<string, Set<string>> = new Map();
+  // 存储离线用户未读消息
+  private offlineUnread: Map<string, string[]> = new Map();
+  private offlineUserRooms: Map<string, string> = new Map();
+  private messageMetadata: Map<
+    string,
+    { sender: string; room: string; senderSocketId: string }
+  > = new Map();
   private polls: Map<
     string,
     {
@@ -44,6 +53,16 @@ export class ChatGateway
     }));
     return arr;
   }
+  private boardcastReadRecept(msgId: string, reader: string) {
+    const msgMeta = this.messageMetadata.get(msgId);
+    if (msgMeta) {
+      this.server.to(msgMeta.senderSocketId).emit('messageRead', {
+        msgId,
+        reader,
+        time: new Date().toLocaleTimeString(),
+      });
+    }
+  }
 
   afterInit(server: Server) {
     console.log('websocket网关已经初始化');
@@ -52,17 +71,31 @@ export class ChatGateway
   handleConnection(client: Socket, ...args: any[]) {
     console.log('客户端连接', client.id);
     client.emit('countUpdate', this.count);
-    // 连接之后不立即发送请求等待前端发送请求
+    const userRoom = this.offlineUserRooms.get(client.id);
+    const unreadMsgs = this.offlineUnread.get(client.id) || [];
+    if (unreadMsgs.length > 0) {
+      unreadMsgs.forEach((msgId) => {
+        this.handleReadRectipt(client, {
+          msgId,
+          room: userRoom as string,
+        });
+      });
+      this.offlineUnread.delete(client.id);
+      this.offlineUserRooms.delete(client.id);
+    }
   }
+
   handleDisconnect(client: Socket) {
     const user = this.users.get(client.id);
     if (user) {
+      this.offlineUserRooms.set(client.id, user.room);
       this.server.emit('userListUpdate', this.getOnlineList());
       this.server.to(user.room).emit('message', {
         user: '系统',
         msg: `${user.username}离开了房间`,
         time: new Date().toLocaleTimeString(),
       });
+      this.offlineUnread.set(client.id, []);
       this.users.delete(client.id);
     }
     console.log('客户端断开', client.id);
@@ -88,7 +121,10 @@ export class ChatGateway
   }
 
   @SubscribeMessage('sendMessage')
-  handleMessage(client: Socket, payload: { msg: string }) {
+  handleMessage(
+    client: Socket,
+    payload: { msg: string; msgId: string; room: string },
+  ) {
     const user = this.users.get(client.id);
     if (!user) {
       client.emit('error', { msg: '请先加入房间' });
@@ -96,12 +132,35 @@ export class ChatGateway
     const message = {
       user: user!.username || '匿名',
       msg: payload.msg,
+      msgId: payload.msgId,
+      room: user?.room,
       time: new Date().toLocaleTimeString(),
       type: 'room',
     };
+    this.messageMetadata.set(payload.msgId, {
+      sender: user!.username,
+      room: user!.room,
+      senderSocketId: client.id,
+    });
+    this.readStatus.set(payload.msgId, new Set());
     this.messageHistory.push(message);
     if (this.messageHistory.length > 50) this.messageHistory.shift();
     this.server.to(user!.room).emit('message', message);
+  }
+
+  @SubscribeMessage('readReceipt')
+  handleReadRectipt(client: Socket, payload: { msgId: string; room: string }) {
+    const user = this.users.get(client.id);
+    if (!user || user.room !== payload.room) {
+      client.emit('error', { msg: '不在当前的房间' });
+      return;
+    }
+    // set
+    const readers = this.readStatus.get(payload.msgId);
+    if (readers) {
+      readers.add(user.username);
+      this.boardcastReadRecept(payload.msgId, user.username);
+    }
   }
 
   @SubscribeMessage('requestUserList')

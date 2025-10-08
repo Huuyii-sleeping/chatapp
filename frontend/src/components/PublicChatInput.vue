@@ -26,9 +26,9 @@ const message = ref("");
 const handleSend = () => {
   if (message.value.trim() && props.socket) {
     emit("sendMessage", message.value);
-    message.value = "";
+    message.value = ""; 
   }
-};
+}; 
 watch(message, () => {
   emit("publicMessage", message.value);
 });

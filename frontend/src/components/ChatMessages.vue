@@ -4,7 +4,15 @@
     <div
       v-for="(msg, index) in messages"
       :key="index"
-      :class="['message', { 'private-msg': msg.type === 'private' }]"
+      :class="[
+        'message',
+        {
+          'private-msg': msg.type === 'private',
+          'image-msg': msg.type === 'image',
+          'local-message': msg.isLocal
+        },
+      ]"
+      @click="handleMessageClick(msg)"
     >
       <template v-if="msg.type === 'private'">
         <strong class="private-label">[私聊]</strong>
@@ -27,6 +35,9 @@
       </template>
       <template v-else>
         <strong>[{{ msg.time }}] {{ msg.user }}:</strong> {{ msg.msg }}
+        <span v-if="msg.readBy && msg.readBy.length > 0" class="read-receipt">
+          已读：{{ msg.readBy.join(", ") }}
+        </span>
       </template>
     </div>
   </div>
@@ -35,9 +46,12 @@
 <script setup>
 import { ref } from "vue";
 
-defineProps({
+const props = defineProps({
   messages: Array,
+  currentUser: String,
 });
+
+const emit = defineEmits(["messageRead"]);
 
 const messagesContainer = ref(null);
 
@@ -52,6 +66,13 @@ const viewImage = (base64) => {
   window.open(base64, "_blank");
 };
 
+const handleMessageClick = (msg) => {
+  // 只有当消息不是自己发送的且没有被自己阅读过时才发送回执
+  if (msg.user !== props.currentUser && !msg.isReadByMe) {
+    emit("messageRead", msg.msgId);
+    msg.isReadByMe = true; // 标记为已读
+  }
+};
 defineExpose({ scrollToBottom });
 </script>
 
@@ -61,6 +82,15 @@ defineExpose({ scrollToBottom });
   padding: 8px;
   border-radius: 4px;
   line-height: 1.4;
+}
+
+.read-receipt {
+  font-size: 12px;
+  color: #28a745;
+  margin-left: 8px;
+  background: #e8f5e9;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .image-msg {
