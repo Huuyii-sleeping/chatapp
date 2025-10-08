@@ -38,6 +38,7 @@
           :messages="messages"
           :currentUser="username"
           @message-read="handleMessageRead"
+          @recall="recallMessage"
         />
 
         <PrivateChatPanel
@@ -82,6 +83,8 @@ const sidebarComponent = ref(null);
 const joinRoom = ({ username: uname, room: rname }) => {
   if (socket.value) socket.value.disconnect();
 
+  username.value = uname;
+  room.value = rname;
   socket.value = io("http://localhost:3000");
 
   socket.value.on("connect", () => {
@@ -142,6 +145,18 @@ const joinRoom = ({ username: uname, room: rname }) => {
     nextTick(() => messagesComponent.value?.scrollToBottom());
   });
 
+  socket.value.on("messageRecalled", (data) => {
+    const msgIndex = messages.value.findIndex((m) => m.msgId === data.msgId);
+    if (msgIndex >= 0) {
+      messages.value[msgIndex] = {
+        ...messages.value[msgIndex],
+        msg: data.newContent,
+        recalled: true,
+        time: data.time,
+      };
+    }
+  });
+
   socket.value.on("countUpdate", (newCount) => {
     count.value = newCount;
   });
@@ -167,6 +182,7 @@ const joinRoom = ({ username: uname, room: rname }) => {
         ...data,
         readBy: [],
         isReadByMe: false,
+        timestamp: data.timestamp || Date.now(),
       });
     }
 
@@ -231,13 +247,23 @@ const sendPrivateMessage = (msg) => {
 const sendMessage = (msg) => {
   if (!socket.value) return;
   const msgId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-
+  const timestamp = Date.now();
   socket.value.emit("sendMessage", {
     msg: msg,
     msgId,
     room: currentRoom.value,
+    timestamp,
   });
 };
+
+const recallMessage = (msgId) => {
+  if (!socket.value || !currentRoom.value) return;
+  socket.value.emit("recallMessage", {
+    msgId,
+    room: currentRoom.value,
+  });
+};
+
 const handleMessageRead = (msgId) => {
   if (socket.value && currentRoom.value) {
     socket.value.emit("readReceipt", {
@@ -266,6 +292,18 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.recall-btn {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #6c757d;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.recall-btn:hover {
+  color: #dc3545;
+}
+
 .chat-container {
   max-width: 1200px;
   margin: 20px auto;

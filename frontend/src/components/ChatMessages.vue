@@ -9,7 +9,7 @@
         {
           'private-msg': msg.type === 'private',
           'image-msg': msg.type === 'image',
-          'local-message': msg.isLocal
+          'local-message': msg.isLocal,
         },
       ]"
       @click="handleMessageClick(msg)"
@@ -39,6 +39,17 @@
           已读：{{ msg.readBy.join(", ") }}
         </span>
       </template>
+      <button
+        v-if="
+          msg.user === currentUser &&
+          !msg.recalled &&
+          isWithinRecallWindow(msg.timestamp)
+        "
+        @click="recallMessage(msg.msgId)"
+        class="recall-btn"
+      >
+        撤回
+      </button>
     </div>
   </div>
 </template>
@@ -51,6 +62,9 @@ const props = defineProps({
   currentUser: String,
 });
 
+console.log(props.currentUser);
+console.log(props.messages);
+
 const emit = defineEmits(["messageRead"]);
 
 const messagesContainer = ref(null);
@@ -60,6 +74,15 @@ const scrollToBottom = () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
   }
+};
+
+const recallMessage = (msgId) => {
+  emit("recall", msgId);
+};
+
+const isWithinRecallWindow = (timestamp) => {
+  console.log(timestamp)
+  return Date.now() - timestamp <= 2 * 60 * 1000;
 };
 
 const viewImage = (base64) => {

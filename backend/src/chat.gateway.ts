@@ -123,7 +123,7 @@ export class ChatGateway
   @SubscribeMessage('sendMessage')
   handleMessage(
     client: Socket,
-    payload: { msg: string; msgId: string; room: string },
+    payload: { msg: string; msgId: string; room: string; timestamp: string },
   ) {
     const user = this.users.get(client.id);
     if (!user) {
@@ -134,6 +134,7 @@ export class ChatGateway
       msg: payload.msg,
       msgId: payload.msgId,
       room: user?.room,
+      timestamp: payload.timestamp,
       time: new Date().toLocaleTimeString(),
       type: 'room',
     };
@@ -263,6 +264,47 @@ export class ChatGateway
 
     this.polls.delete(payload.room);
     this.server.to(payload.room).emit('pollEnded');
+  }
+
+  @SubscribeMessage('recallMessage')
+  handleRecaolMessage(
+    client: Socket,
+    payload: { msgId: string; room: string },
+  ) {
+    const user = this.users.get(client.id);
+    if (!user || user.room !== payload.room) {
+      client.emit('error', { msg: '不在当前的房间' });
+      return;
+    }
+
+    const messageIndex = this.messageHistory.findIndex(
+      (msg) => msg.msgId === payload.msgId && msg.user === user.username,
+    );
+
+    if (messageIndex === -1) {
+      client.emit('error', { msg: '消息不存在或无权撤回' });
+      return;
+    }
+
+    const message = this.messageHistory[messageIndex];
+    const now = Date.now();
+    if (now - message.timestamp > 2 * 60 * 100) {
+      console.log()
+      client.emit('error', { msg: '消息发送超过两分钟，无法撤回' });
+      return;
+    }
+
+    this.messageHistory[messageIndex] = {
+      ...message,
+      msg: '[该消息已经被撤回]',
+      recalled: true,
+      time: new Date().toLocaleTimeString(),
+    };
+    this.server.to(payload.room).emit('messageRecalled', {
+      msgId: payload.msgId,
+      newContent: '[该消息已经被撤回]',
+      time: new Date().toLocaleTimeString(),
+    });
   }
 
   @SubscribeMessage('uploadImage')
